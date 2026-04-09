@@ -38,6 +38,7 @@ const featureFlags: Record<string, boolean> = {
   TRANSCRIPT_CLASSIFIER: false,
   WEB_BROWSER_TOOL: false,
   MESSAGE_ACTIONS: false,
+  REPO_MAP: false,
   BUDDY: true,
   CHICAGO_MCP: false,
   COWORKER_TYPE_TELEMETRY: false,
