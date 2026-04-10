@@ -7,10 +7,12 @@ import { getActiveProviderProfileSelectionTargetKey } from '../providerProfiles.
 
 export type ProviderModelSettings = Partial<Record<APIProvider, string>>
 export type PersistedEffortLevel = EffortLevel | OpenAIEffortLevel
+export type PersistedServiceTier = 'fast'
 
 export type ProviderTargetSelection = {
   model?: string
   effortLevel?: PersistedEffortLevel
+  serviceTier?: PersistedServiceTier
 }
 
 export type ProviderTargetSelections = Record<
@@ -129,6 +131,12 @@ function getPersistedEffortLevel(
   return undefined
 }
 
+function getPersistedServiceTier(
+  value: unknown,
+): PersistedServiceTier | undefined {
+  return value === 'fast' ? value : undefined
+}
+
 export function resolveSettingsModelProvider(options?: {
   provider?: APIProvider
   model?: string
@@ -202,6 +210,7 @@ function buildProviderTargetSelectionPatch(options: {
   targetKey: string
   model?: string | null
   effortLevel?: PersistedEffortLevel | null
+  serviceTier?: PersistedServiceTier | null
 }): ProviderTargetSelection | undefined {
   const current = getProviderTargetSelection(options.settings, options.targetKey)
   const next: ProviderTargetSelection = current ? { ...current } : {}
@@ -224,6 +233,16 @@ function buildProviderTargetSelectionPatch(options: {
       next.effortLevel = effortLevel
     } else {
       delete next.effortLevel
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(options, 'serviceTier')) {
+    touched = true
+    const serviceTier = getPersistedServiceTier(options.serviceTier)
+    if (serviceTier) {
+      next.serviceTier = serviceTier
+    } else {
+      delete next.serviceTier
     }
   }
 
@@ -298,11 +317,34 @@ export function getPersistedEffortSettingForProvider(options?: {
   return getPersistedEffortLevel(settings?.effortLevel)
 }
 
+export function getPersistedServiceTierForProvider(options?: {
+  settings?: SettingsJson
+  provider?: APIProvider
+  model?: string
+  baseUrl?: string
+  targetKey?: string
+  profileId?: string
+}): PersistedServiceTier | undefined {
+  const settings = options?.settings
+  const target = resolveProviderSelectionTarget({
+    provider: options?.provider,
+    model: options?.model,
+    baseUrl: options?.baseUrl,
+    targetKey: options?.targetKey,
+    profileId: options?.profileId,
+  })
+
+  return getPersistedServiceTier(
+    getProviderTargetSelection(settings, target.targetKey)?.serviceTier,
+  )
+}
+
 export function buildProviderModelSettingsUpdate(options: {
   settings?: SettingsJson
   provider?: APIProvider
   model?: string | null
   effortLevel?: PersistedEffortLevel | null
+  serviceTier?: PersistedServiceTier | null
   baseUrl?: string
   targetKey?: string
   profileId?: string
@@ -325,6 +367,9 @@ export function buildProviderModelSettingsUpdate(options: {
       : {}),
     ...(Object.prototype.hasOwnProperty.call(options, 'effortLevel')
       ? { effortLevel: options.effortLevel }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(options, 'serviceTier')
+      ? { serviceTier: options.serviceTier }
       : {}),
   })
 
@@ -355,11 +400,12 @@ export function buildProviderModelSettingsUpdate(options: {
     } as SettingsJson['providerTargetSelections']
   } else if (
     Object.prototype.hasOwnProperty.call(options, 'model') ||
-    Object.prototype.hasOwnProperty.call(options, 'effortLevel')
+    Object.prototype.hasOwnProperty.call(options, 'effortLevel') ||
+    Object.prototype.hasOwnProperty.call(options, 'serviceTier')
   ) {
     update.providerTargetSelections = {
       [target.targetKey]: undefined,
-    } as SettingsJson['providerTargetSelections']
+    } as unknown as SettingsJson['providerTargetSelections']
   }
 
   return update
