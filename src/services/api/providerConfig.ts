@@ -68,6 +68,7 @@ const CODEX_ALIAS_MODELS: Record<
 
 type CodexAlias = keyof typeof CODEX_ALIAS_MODELS
 type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh'
+export type ProviderServiceTier = 'priority'
 
 const OPENAI_CODEX_SHORTCUT_ALIASES = new Set(['codexplan', 'codexspark'])
 
@@ -81,6 +82,7 @@ export type ResolvedProviderRequest = {
   reasoning?: {
     effort: ReasoningEffort
   }
+  serviceTier?: ProviderServiceTier
 }
 
 export type ResolvedCodexCredentials = {
@@ -350,6 +352,7 @@ export function resolveProviderRequest(options?: {
   baseUrl?: string
   fallbackModel?: string
   reasoningEffortOverride?: ReasoningEffort
+  serviceTierOverride?: ProviderServiceTier
 }): ResolvedProviderRequest {
   const isGithubMode = isEnvTruthy(process.env.CLAUDE_CODE_USE_GITHUB)
   const isMistralMode = isEnvTruthy(process.env.CLAUDE_CODE_USE_MISTRAL)
@@ -426,6 +429,7 @@ export function resolveProviderRequest(options?: {
   const reasoning = options?.reasoningEffortOverride
     ? { effort: options.reasoningEffortOverride }
     : descriptor.reasoning
+  const serviceTier = options?.serviceTierOverride
   const defaultBaseUrl =
     transport === 'codex_responses'
       ? (isGithubMode ? GITHUB_COPILOT_BASE_URL : DEFAULT_CODEX_BASE_URL)
@@ -437,6 +441,7 @@ export function resolveProviderRequest(options?: {
     resolvedModel,
     baseUrl: (rawBaseUrl ?? defaultBaseUrl).replace(/\/+$/, ''),
     reasoning,
+    serviceTier,
   }
 }
 

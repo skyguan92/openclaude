@@ -7,9 +7,11 @@ import {
   convertAnthropicMessagesToResponsesInput,
   convertCodexResponseToAnthropicMessage,
   convertToolsToResponsesTools,
+  performCodexRequest,
 } from './codexShim.js'
 
 const tempDirs: string[] = []
+const originalFetch = globalThis.fetch
 const originalEnv = {
   OPENAI_BASE_URL: process.env.OPENAI_BASE_URL,
   OPENAI_API_BASE: process.env.OPENAI_API_BASE,
@@ -29,6 +31,7 @@ afterEach(() => {
 
   if (originalEnv.OPENAI_MODEL === undefined) delete process.env.OPENAI_MODEL
   else process.env.OPENAI_MODEL = originalEnv.OPENAI_MODEL
+  globalThis.fetch = originalFetch
 
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop()
@@ -102,6 +105,17 @@ describe('Codex provider config', () => {
     expect(resolved.transport).toBe('codex_responses')
     expect(resolved.resolvedModel).toBe('gpt-5.3-codex-spark')
     expect(resolved.baseUrl).toBe('https://chatgpt.com/backend-api/codex')
+  })
+
+  test('applies explicit Codex service tiers to resolved requests', async () => {
+    const { resolveProviderRequest } = await importFreshProviderConfigModule()
+    const resolved = resolveProviderRequest({
+      model: 'gpt-5.4',
+      serviceTierOverride: 'priority',
+    })
+
+    expect(resolved.transport).toBe('codex_responses')
+    expect(resolved.serviceTier).toBe('priority')
   })
 
   test('does not force Codex transport when a local non-Codex base URL is explicit', async () => {
@@ -219,6 +233,42 @@ describe('Codex provider config', () => {
 })
 
 describe('Codex request translation', () => {
+  test('forwards service tier to the Codex responses payload', async () => {
+    let requestBody: Record<string, unknown> | undefined
+    globalThis.fetch = (async (_input, init) => {
+      requestBody = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+      return new Response('event: response.completed\ndata: {"response":{"status":"completed"}}\n\n', {
+        status: 200,
+        headers: {
+          'content-type': 'text/event-stream',
+        },
+      })
+    }) as typeof fetch
+
+    await performCodexRequest({
+      request: {
+        transport: 'codex_responses',
+        requestedModel: 'gpt-5.4',
+        resolvedModel: 'gpt-5.4',
+        baseUrl: 'https://chatgpt.com/backend-api/codex',
+        serviceTier: 'priority',
+      },
+      credentials: {
+        apiKey: 'test-token',
+        source: 'env',
+      },
+      params: {
+        model: 'gpt-5.4',
+        messages: [],
+        stream: true,
+        max_tokens: 256,
+      } as any,
+      defaultHeaders: {},
+    })
+
+    expect(requestBody?.service_tier).toBe('priority')
+  })
+
   test('normalizes optional parameters into strict Responses schemas', () => {
     const tools = convertToolsToResponsesTools([
       {

@@ -5,9 +5,17 @@
  * Addresses: https://github.com/Gitlawb/openclaude/issues/55
  */
 
-import { isLocalProviderUrl, resolveProviderRequest } from '../services/api/providerConfig.js'
+import {
+  DEFAULT_CODEX_BASE_URL,
+  isLocalProviderUrl,
+  resolveProviderRequest,
+} from '../services/api/providerConfig.js'
+import { getPersistedEffortSettingForProvider } from '../utils/model/providerModelSettings.js'
+import { getAPIProvider } from '../utils/model/providers.js'
+import { formatCodexModelDisplay } from '../utils/model/codexDisplay.js'
 import { getLocalOpenAICompatibleProviderLabel } from '../utils/providerDiscovery.js'
-import { getSettings_DEPRECATED } from '../utils/settings/settings.js'
+import { getInitialProviderFastModeSetting } from '../utils/providerFastMode.js'
+import { getInitialSettings, getSettings_DEPRECATED } from '../utils/settings/settings.js'
 import { parseUserSpecifiedModel } from '../utils/model/model.js'
 
 declare const MACRO: { VERSION: string; DISPLAY_VERSION?: string }
@@ -84,10 +92,12 @@ const LOGO_CLAUDE = [
 // ─── Provider detection ───────────────────────────────────────────────────────
 
 function detectProvider(): { name: string; model: string; baseUrl: string; isLocal: boolean } {
+  const apiProvider = getAPIProvider()
   const useGemini = process.env.CLAUDE_CODE_USE_GEMINI === '1' || process.env.CLAUDE_CODE_USE_GEMINI === 'true'
   const useGithub = process.env.CLAUDE_CODE_USE_GITHUB === '1' || process.env.CLAUDE_CODE_USE_GITHUB === 'true'
   const useOpenAI = process.env.CLAUDE_CODE_USE_OPENAI === '1' || process.env.CLAUDE_CODE_USE_OPENAI === 'true'
   const useMistral = process.env.CLAUDE_CODE_USE_MISTRAL === '1' || process.env.CLAUDE_CODE_USE_MISTRAL === 'true'
+  const initialSettings = getInitialSettings()
 
   if (useGemini) {
     const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
@@ -106,6 +116,27 @@ function detectProvider(): { name: string; model: string; baseUrl: string; isLoc
     const baseUrl =
       process.env.OPENAI_BASE_URL || 'https://api.githubcopilot.com'
     return { name: 'GitHub Copilot', model, baseUrl, isLocal: false }
+  }
+
+  if (apiProvider === 'codex') {
+    const model = process.env.OPENAI_MODEL || 'codexplan'
+    const baseUrl = process.env.OPENAI_BASE_URL || DEFAULT_CODEX_BASE_URL
+    return {
+      name: 'Codex',
+      model: formatCodexModelDisplay({
+        model,
+        effortValue: getPersistedEffortSettingForProvider({
+          settings: initialSettings,
+          provider: 'codex',
+        }),
+        fastMode: getInitialProviderFastModeSetting(model, {
+          provider: 'codex',
+          settings: initialSettings,
+        }),
+      }),
+      baseUrl,
+      isLocal: isLocalProviderUrl(baseUrl),
+    }
   }
 
   if (useOpenAI) {
@@ -128,13 +159,11 @@ function detectProvider(): { name: string; model: string; baseUrl: string; isLoc
     else if (/azure/i.test(baseUrl))                                  name = 'Azure OpenAI'
     else if (/llama/i.test(rawModel))                                    name = 'Meta Llama'
     else if (isLocal)                                                  name = getLocalOpenAICompatibleProviderLabel(baseUrl)
-    
-    // Resolve model alias to actual model name + reasoning effort
     let displayModel = resolvedRequest.resolvedModel
     if (resolvedRequest.reasoning?.effort) {
       displayModel = `${displayModel} (${resolvedRequest.reasoning.effort})`
     }
-    
+
     return { name, model: displayModel, baseUrl, isLocal }
   }
 
