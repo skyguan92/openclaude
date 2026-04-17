@@ -3,9 +3,12 @@ import { isUltrathinkEnabled } from './thinking.js'
 import { getInitialSettings } from './settings/settings.js'
 import { isProSubscriber, isMaxSubscriber, isTeamSubscriber } from './auth.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
-import { getAPIProvider } from './model/providers.js'
+import { getAPIProvider, type APIProvider } from './model/providers.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
-import { supportsCodexReasoningEffort } from '../services/api/providerConfig.js'
+import {
+  getReasoningEffortForModel,
+  supportsCodexReasoningEffort,
+} from '../services/api/providerConfig.js'
 import { isEnvTruthy } from './envUtils.js'
 import { getPersistedEffortSettingForProvider } from './model/providerModelSettings.js'
 import type { EffortLevel } from 'src/entrypoints/sdk/runtimeTypes.js'
@@ -30,7 +33,10 @@ export type OpenAIEffortLevel = typeof OPENAI_EFFORT_LEVELS[number]
 export type EffortValue = EffortLevel | OpenAIEffortLevel | number
 
 // @[MODEL LAUNCH]: Add the new model to the allowlist if it supports the effort parameter.
-export function modelSupportsEffort(model: string): boolean {
+export function modelSupportsEffort(
+  model: string,
+  provider: APIProvider = getAPIProvider(),
+): boolean {
   const m = model.toLowerCase()
   if (isEnvTruthy(process.env.CLAUDE_CODE_ALWAYS_ENABLE_EFFORT)) {
     return true
@@ -39,7 +45,7 @@ export function modelSupportsEffort(model: string): boolean {
   if (supported3P !== undefined) {
     return supported3P
   }
-  if (modelUsesOpenAIEffort(model) && supportsCodexReasoningEffort(model)) {
+  if (modelUsesOpenAIEffort(model, provider) && supportsCodexReasoningEffort(model)) {
     return true
   }
   // Supported by a subset of Claude 4 models
@@ -58,7 +64,7 @@ export function modelSupportsEffort(model: string): boolean {
   // Default to true for unknown model strings on 1P.
   // Do not default to true for 3P as they have different formats for their
   // model strings (ex. anthropics/claude-code#30795)
-  return getAPIProvider() === 'firstParty'
+  return provider === 'firstParty'
 }
 
 // @[MODEL LAUNCH]: Add the new model to the allowlist if it supports 'max' effort.
@@ -85,16 +91,21 @@ export function isOpenAIEffortLevel(value: string): value is OpenAIEffortLevel {
   return (OPENAI_EFFORT_LEVELS as readonly string[]).includes(value)
 }
 
-export function modelUsesOpenAIEffort(model: string): boolean {
-  const provider = getAPIProvider()
+export function modelUsesOpenAIEffort(
+  _model: string,
+  provider: APIProvider = getAPIProvider(),
+): boolean {
   return provider === 'openai' || provider === 'codex'
 }
 
-export function getAvailableEffortLevels(model: string): EffortLevel[] | OpenAIEffortLevel[] {
-  if (!modelSupportsEffort(model)) {
+export function getAvailableEffortLevels(
+  model: string,
+  provider: APIProvider = getAPIProvider(),
+): EffortLevel[] | OpenAIEffortLevel[] {
+  if (!modelSupportsEffort(model, provider)) {
     return []
   }
-  if (modelUsesOpenAIEffort(model)) {
+  if (modelUsesOpenAIEffort(model, provider)) {
     return [...OPENAI_EFFORT_LEVELS] as OpenAIEffortLevel[]
   }
   const levels: EffortLevel[] = ['low', 'medium', 'high']
@@ -102,6 +113,23 @@ export function getAvailableEffortLevels(model: string): EffortLevel[] | OpenAIE
     levels.push('max')
   }
   return levels
+}
+
+export function getDefaultDisplayEffortForModel(
+  model: string,
+  provider: APIProvider = getAPIProvider(),
+): EffortValue | undefined {
+  const defaultEffort = getDefaultEffortForModel(model)
+  if (defaultEffort !== undefined) {
+    return defaultEffort
+  }
+  if (
+    !modelUsesOpenAIEffort(model, provider) ||
+    !modelSupportsEffort(model, provider)
+  ) {
+    return undefined
+  }
+  return getReasoningEffortForModel(model) ?? 'high'
 }
 
 export function getEffortLevelLabel(level: EffortLevel | OpenAIEffortLevel): string {

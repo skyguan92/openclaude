@@ -64,3 +64,36 @@ test('Claude models still advertise max effort instead of xhigh', async () => {
     'max',
   ])
 })
+
+test('explicit provider overrides current provider for picker previews', async () => {
+  const {
+    getAvailableEffortLevels,
+    getDefaultDisplayEffortForModel,
+    modelSupportsEffort,
+    modelUsesOpenAIEffort,
+  } = await importFreshEffortModule('firstParty')
+
+  expect(modelUsesOpenAIEffort('gpt-5.4-mini', 'codex')).toBe(true)
+  expect(modelSupportsEffort('gpt-5.4-mini', 'codex')).toBe(true)
+  expect(getAvailableEffortLevels('gpt-5.4-mini', 'codex')).toEqual([
+    'low',
+    'medium',
+    'high',
+    'xhigh',
+  ])
+  expect(getDefaultDisplayEffortForModel('gpt-5.4-mini', 'codex')).toBe(
+    'medium',
+  )
+})
+
+test('unsupported OpenAI/Codex models do not expose effort controls', async () => {
+  const {
+    getAvailableEffortLevels,
+    getDefaultDisplayEffortForModel,
+    modelSupportsEffort,
+  } = await importFreshEffortModule('firstParty')
+
+  expect(modelSupportsEffort('gpt-4o', 'openai')).toBe(false)
+  expect(getAvailableEffortLevels('gpt-4o', 'openai')).toEqual([])
+  expect(getDefaultDisplayEffortForModel('gpt-4o', 'openai')).toBeUndefined()
+})
