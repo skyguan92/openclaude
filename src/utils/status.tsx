@@ -354,7 +354,7 @@ export function buildAPIProviderProperties(): Property[] {
       }
       properties.push({
         label: 'Model',
-        value: modelDisplay
+        value: redactSecretValueForDisplay(modelDisplay, process.env) ?? modelDisplay
       });
     }
   } else if (apiProvider === 'codex') {
@@ -380,7 +380,7 @@ export function buildAPIProviderProperties(): Property[] {
       });
       properties.push({
         label: 'Model',
-        value: modelDisplay
+        value: redactSecretValueForDisplay(modelDisplay, process.env) ?? modelDisplay
       });
     }
   } else if (apiProvider === 'gemini') {

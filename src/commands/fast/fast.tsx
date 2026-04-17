@@ -139,7 +139,6 @@ export function FastModePicker({
   provider: FastModeCommandProvider
   unavailableReason: string | null
 }): React.ReactNode {
-  const model = useAppState((s: AppState) => s.mainLoopModel)
   const initialFastMode = useAppState((s: AppState) => s.fastMode ?? false)
   const providerSelectionTargetKey = useAppState(
     (s: AppState) => s.providerSelectionTargetKey,
@@ -174,17 +173,6 @@ export function FastModePicker({
       source: 'picker' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
 
-    if (
-      provider === 'firstParty' &&
-      !enableFastMode &&
-      !isFastModeSupportedByModel(model)
-    ) {
-      setAppState((prev: AppState) => ({
-        ...prev,
-        fastMode: false,
-      }))
-    }
-
     onDone(
       getFastModeConfirmMessage({
         enable: enableFastMode,
@@ -194,7 +182,6 @@ export function FastModePicker({
     )
   }, [
     enableFastMode,
-    model,
     onDone,
     provider,
     providerSelectionTargetKey,
