@@ -3,11 +3,10 @@ import { Box, Text } from '../ink.js'
 import {
   convertEffortValueToLevel,
   getAvailableEffortLevels,
-  getDefaultEffortForModel,
+  getDefaultDisplayEffortForModel,
   getEffortLevelDescription,
   getEffortLevelLabel,
   modelSupportsEffort,
-  OPENAI_EFFORT_LEVELS,
   type EffortValue,
 } from '../utils/effort.js'
 import type { ModelSetting } from '../utils/model/model.js'
@@ -115,24 +114,14 @@ function getDefaultEffortForTargetModel(
   target: ProviderSelectionTargetOption,
   model: string,
 ): EffortValue | undefined {
-  if (target.provider === 'codex' || target.provider === 'openai') {
-    return 'high'
-  }
-  return getDefaultEffortForModel(model)
+  return getDefaultDisplayEffortForModel(model, target.provider)
 }
 
 function buildEffortOptionsForTarget(
   target: ProviderSelectionTargetOption,
   model: string,
 ) {
-  if (target.provider === 'codex' || target.provider === 'openai') {
-    return {
-      supportsEffort: true,
-      levels: [...OPENAI_EFFORT_LEVELS],
-    }
-  }
-
-  if (target.provider !== 'firstParty' || !modelSupportsEffort(model)) {
+  if (!modelSupportsEffort(model, target.provider)) {
     return {
       supportsEffort: false,
       levels: [] as string[],
@@ -141,7 +130,9 @@ function buildEffortOptionsForTarget(
 
   return {
     supportsEffort: true,
-    levels: getAvailableEffortLevels(model).map(level => String(level)),
+    levels: getAvailableEffortLevels(model, target.provider).map(level =>
+      String(level),
+    ),
   }
 }
 
